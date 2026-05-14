@@ -3,7 +3,6 @@ import {
     SchemaType,
     type Content,
     type Tool,
-    type FunctionDeclaration,
     type FunctionCallingMode,
 } from '@google/generative-ai';
 import {env} from '../../config/env';
@@ -20,7 +19,7 @@ import type {
 // Constants
 // ============================================================
 
-const DEFAULT_MODEL = 'gemini-1.5-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_MAX_TOKENS = 8192;
 const DEFAULT_TEMPERATURE = 0.7;
 
