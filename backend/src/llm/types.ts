@@ -63,8 +63,8 @@ export interface ChatOptions {
 }
 
 // ============================================================
-// Provider Interface — kontrak yang harus diimplementasi
-// semua adapter
+// Provider Interface — contracts that must be implemented
+// by all adapters
 // ============================================================
 
 export interface LLMProvider {
@@ -77,14 +77,15 @@ export interface LLMProvider {
 }
 
 // ============================================================
-// Agent Types — dipakai oleh orchestrator dan SSE route
+// Agent Types — used by orchestrator and SSE route
 // ============================================================
 
 export type AgentStepType =
     | 'thinking'
     | 'tool_call'
     | 'tool_result'
-    | 'final_answer';
+    | 'final_answer'
+    | 'error';
 
 export interface AgentStep {
     type: AgentStepType;
