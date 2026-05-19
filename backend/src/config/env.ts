@@ -8,11 +8,10 @@ const envSchema = z.object({
     PORT: z.coerce.number().default(3001),
 
     // LLM
-    LLM_PROVIDER: z.enum(['claude', 'gemini', 'groq']),
-    LLM_MODEL: z.string().optional(),
+    LLM_PROVIDER: z.enum(['claude', 'gemini']),
+    LLM_MODEL: z.string(),
     ANTHROPIC_API_KEY: z.string().optional(),
     GOOGLE_AI_API_KEY: z.string().optional(),
-    GROQ_API_KEY: z.string().optional(),
 
     // Tools
     TAVILY_API_KEY: z.string(),

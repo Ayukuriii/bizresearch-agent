@@ -1,4 +1,4 @@
-import { getRedisClient } from '../db/redis';
+import { getRedisClient } from '../cache/redis';
 import { LLMMessage } from '../llm/types';
 import { AppError } from '../utils/errors';
 

@@ -1,6 +1,7 @@
 import { env } from '../config/env';
 import { GeminiAdapter } from './adapters/gemini';
 import type { LLMProvider } from './types';
+import {ClaudeAdapter} from "./adapters/claude";
 
 // Singleton instance — adapter hanya dibuat sekali
 // dan di-reuse selama server hidup
@@ -17,16 +18,8 @@ export function getLLMProvider(): LLMProvider {
             break;
 
         case 'claude':
-            // Diimplementasi di Phase 3
-            throw new Error(
-                'Claude adapter belum tersedia. Akan diimplementasi di Phase 3.'
-            );
-
-        case 'groq':
-            // Diimplementasi di Phase 3
-            throw new Error(
-                'Groq adapter belum tersedia. Akan diimplementasi di Phase 3.'
-            );
+            instance = new ClaudeAdapter();
+            break;
 
         default:
             throw new Error(

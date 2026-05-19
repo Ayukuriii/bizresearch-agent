@@ -1,0 +1,11 @@
+# GET api health
+GET http://localhost:3001/api/health
+
+###
+# POST agent run
+POST http://localhost:3001/api/agent/run
+Content-Type: application/json
+
+{
+  "message": "Siapa kompetitor utama Tokopedia di Indonesia?"
+}
