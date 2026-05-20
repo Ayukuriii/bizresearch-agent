@@ -5,6 +5,7 @@ import { AppError } from './utils/errors';
 import healthRouter from './routes/health';
 import agentRouter from './routes/agent';
 import historyRouter from './routes/history';
+import logger from "./lib/logger";
 
 // ============================================================
 // Express App
@@ -56,8 +57,8 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
         return;
     }
 
-    // Error tidak terduga — log dan return 500
-    console.error('Unhandled error:', err);
+    // Unexpected error — log and return 500
+    logger.error({ err }, 'Unhandled error');
     res.status(500).json({
         success: false,
         error: {

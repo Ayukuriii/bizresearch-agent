@@ -3,10 +3,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAgentStore } from '@/store/agentStore';
-import { Copy, Check, Cpu } from 'lucide-react';
+import { Copy, Check, Cpu, Zap } from 'lucide-react';
 import { useState, useCallback } from 'react';
+import logger from '@/lib/logger';
 
-// --- Copy button with transient feedback ---
+// ─── Copy button ──────────────────────────────────────────────────────────────
 
 function CopyButton({ text }: { text: string }) {
     const [copied, setCopied] = useState(false);
@@ -18,7 +19,7 @@ function CopyButton({ text }: { text: string }) {
             setTimeout(() => setCopied(false), 2000);
         } catch {
             // Clipboard API unavailable (non-HTTPS or blocked by browser)
-            console.error('[ReportOutput] clipboard write failed');
+            logger.error('[ReportOutput] clipboard write failed');
         }
     }, [text]);
 
@@ -44,7 +45,7 @@ function CopyButton({ text }: { text: string }) {
     );
 }
 
-// --- Empty state ---
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
 function EmptyState() {
     return (
@@ -57,12 +58,11 @@ function EmptyState() {
     );
 }
 
-// --- Main component ---
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function ReportOutput() {
-    const { finalAnswer, status, activeProvider } = useAgentStore();
+    const { finalAnswer, status, activeProvider, fromCache } = useAgentStore();
 
-    // Don't render anything before the agent has been run at least once
     if (status === 'idle') return null;
 
     return (
@@ -74,6 +74,16 @@ export function ReportOutput() {
                     {activeProvider && (
                         <Badge variant="outline" className="text-xs font-mono">
                             {activeProvider}
+                        </Badge>
+                    )}
+                    {/* Cache badge — shown when this result was served from Redis */}
+                    {fromCache && (
+                        <Badge
+                            variant="secondary"
+                            className="text-xs gap-1"
+                        >
+                            <Zap className="w-3 h-3" />
+                            Cached
                         </Badge>
                     )}
                 </div>

@@ -2,14 +2,15 @@ import app from './app';
 import { env } from './config/env';
 import { connectDB } from './db';
 import { connectRedis } from './cache/redis';
+import logger from './lib/logger';
 
 // ============================================================
 // Server Entry Point
-// Urutan startup:
-//   1. Koneksi PostgreSQL
-//   2. Koneksi Redis
+// Startup order:
+//   1. PostgreSQL connection
+//   2. Redis connection
 //   3. Express listen
-// Jika salah satu gagal → proses exit dengan kode 1
+// Any failure → process exits with code 1
 // ============================================================
 
 async function bootstrap(): Promise<void> {
@@ -22,13 +23,18 @@ async function bootstrap(): Promise<void> {
 
         // 3. Start server
         app.listen(env.PORT, () => {
-            console.log(`✅  Server berjalan di http://localhost:${env.PORT}`);
-            console.log(`    Provider : ${env.LLM_PROVIDER}`);
-            console.log(`    Model    : ${env.LLM_MODEL}`);
-            console.log(`    Env      : ${env.NODE_ENV}`);
+            logger.info(
+                {
+                    port: env.PORT,
+                    provider: env.LLM_PROVIDER,
+                    model: env.LLM_MODEL,
+                    env: env.NODE_ENV,
+                },
+                'Server started',
+            );
         });
     } catch (err) {
-        console.error('❌  Gagal menjalankan server:', err);
+        logger.error({ err }, 'Failed to start server');
         process.exit(1);
     }
 }

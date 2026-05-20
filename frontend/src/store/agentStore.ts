@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type { SSEStepPayload } from '../lib/sseClient';
 
-// Re-export supaya komponen tidak perlu import dari sseClient langsung
 export type { SSEStepPayload as AgentStep };
 
 export type AgentStatus = 'idle' | 'running' | 'done' | 'error';
@@ -13,18 +12,19 @@ interface AgentState {
     finalAnswer: string | null;
     status: AgentStatus;
     activeProvider: string | null;
+    fromCache: boolean;
+    pendingPrompt: string | null;  // set by DemoSidebar, consumed by AgentChat
 
     // — Actions —
     addStep: (step: SSEStepPayload) => void;
     setFinalAnswer: (answer: string) => void;
     setStatus: (status: AgentStatus) => void;
     setProvider: (provider: string) => void;
+    setFromCache: (fromCache: boolean) => void;
+    setPendingPrompt: (prompt: string | null) => void;
     resetSession: () => void;
 }
 
-// sessionId di-generate sekali dan di-persist ke sessionStorage.
-// Kalau user refresh halaman dalam sesi yang sama, sessionId tetap sama
-// sehingga history Redis masih bisa diambil.
 function getOrCreateSessionId(): string {
     const KEY = 'bizresearch_session_id';
     const existing = sessionStorage.getItem(KEY);
@@ -42,6 +42,8 @@ export const useAgentStore = create<AgentState>((set) => ({
     finalAnswer: null,
     status: 'idle',
     activeProvider: null,
+    fromCache: false,
+    pendingPrompt: null,
 
     // — Actions —
     addStep: (step) =>
@@ -56,14 +58,21 @@ export const useAgentStore = create<AgentState>((set) => ({
     setProvider: (provider) =>
         set({ activeProvider: provider }),
 
+    setFromCache: (fromCache) =>
+        set({ fromCache }),
+
+    setPendingPrompt: (prompt) =>
+        set({ pendingPrompt: prompt }),
+
     resetSession: () => {
-        // Hapus sessionId lama, generate yang baru
         sessionStorage.removeItem('bizresearch_session_id');
         set({
             sessionId: getOrCreateSessionId(),
             steps: [],
             finalAnswer: null,
             status: 'idle',
+            fromCache: false,
+            pendingPrompt: null,
         });
     },
 }));

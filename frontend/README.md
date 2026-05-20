@@ -1,73 +1,206 @@
-# React + TypeScript + Vite
+# BizResearch Agent Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend application for BizResearch Agent, built with React, TypeScript, Vite, and Tailwind CSS.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Make sure you have the following installed:
 
-## React Compiler
+- Node.js
+- npm
+- Docker
+- Docker Compose
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Docker is required for running the backend dependencies such as PostgreSQL and Redis.
 
-## Expanding the ESLint configuration
+## Environment Setup
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Copy the example environment file:
+```bash
+cp .env/example .env
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Set the backend API URL:
+```bash
+VITE_API_URL=http://localhost:3001/api
 ```
+
+## Install Dependencies
+
+From the `frontend` directory:
+```bash
+npm install
+```
+
+## Running the Project Locally with Docker
+
+The frontend depends on the backend API. The backend depends on PostgreSQL and Redis, which are started with Docker Compose from the `backend` directory.
+
+### 1. Start PostgreSQL and Redis
+
+From the `backend` directory:
+```bash
+cd ../backend docker compose up -d
+```
+
+This starts:
+
+- PostgreSQL on `localhost:5432`
+- Redis on `localhost:6379`
+
+Check running containers:
+```bash
+docker compose up
+```
+
+### 2. Start the Backend
+
+From the `backend` directory:
+```bash
+npm install
+npm run dev
+```
+
+The backend should be available at:
+```text
+http://localhost:3001
+```
+
+### 3. Start the Frontend
+
+Open a new terminal and go to the `frontend` directory:
+```bash
+cd ../frontend 
+npm install 
+npm run dev
+```
+
+The frontend should be available at:
+```text
+http://localhost:5173
+```
+
+Open the app in your browser:
+```text
+http://localhost:5173
+```
+
+## Available Scripts
+
+### Development
+```bash
+npm run dev
+```
+
+Runs the frontend development server with Vite.
+
+### Build
+```bash
+npm run build
+```
+
+Builds the frontend for production.
+
+### Preview Production Build
+```bash
+npm run preview
+```
+
+Serves the production build locally for preview.
+
+### Type Check
+```bash
+npm run typecheck
+```
+
+Runs TypeScript type checking without emitting files.
+
+### Lint
+```bash
+npm run lint
+```
+
+Runs ESLint.
+
+### Fix Lint Issues
+```bash
+npm run lint:fix
+```
+
+Runs ESLint and automatically fixes supported issues.
+
+## Local Development Flow
+
+1. Start backend dependencies with Docker:
+```bash
+cd ../backend 
+docker compose up -d
+```
+
+2. Start the backend:
+```bash
+npm install 
+npm run dev
+```
+
+3. Start the frontend:
+```bash
+cd ../frontend 
+npm install 
+npm run dev
+```
+
+4. Open:
+```text
+http://localhost:5173
+```
+
+## Troubleshooting
+
+### Frontend cannot connect to backend
+
+Make sure the backend is running at:
+```text
+http://localhost:3001
+```
+
+Make sure `frontend/.env` contains:
+```bash
+VITE_API_URL=http://localhost:3001/api
+```
+
+After changing `.env`, restart the Vite dev server:
+```bash
+npm run dev
+```
+
+### Backend services are not running
+
+Check Docker containers from the `backend` directory:
+```bash
+docker compose ps
+```
+
+If they are not running, start them:
+```bash
+docker compose up -d
+```
+
+### CORS error
+
+Make sure the backend `.env` contains:
+```dotenv
+FRONTEND_URL=http://localhost:5173
+```
+
+Then restart the backend.
+
+### Port already in use
+
+If `localhost:5173` is already used, Vite may start on another port. Use the URL printed in the terminal.
+
+If the backend port `3001` is already used, update the backend `PORT` value and also update:
+```dotenv
+VITE_API_URL=http://localhost:<new-port>/api
+```
+

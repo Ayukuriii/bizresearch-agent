@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { runAgent } from '../agent/orchestrator';
 import { AgentStep } from '../llm/types';
 import { env } from '../config/env';
+import logger from '../lib/logger';
 import {
     createSession,
     createSessionWithId,
@@ -12,11 +13,12 @@ import {
     getSession,
     touchSession,
 } from '../db/queries';
+import { getCachedAnswer, setCachedAnswer } from '../lib/cache';
 
 // ============================================================
 // POST /api/agent/run
-// Menerima message + sessionId, jalankan agent loop,
-// stream setiap step ke frontend via SSE
+// Accepts message + sessionId, runs the agent loop,
+// streams each step to the frontend via SSE
 // ============================================================
 
 const router = Router();
@@ -24,8 +26,8 @@ const router = Router();
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 const runAgentSchema = z.object({
-    message: z.string().min(1, 'Message tidak boleh kosong').max(2000),
-    sessionId: z.string().uuid().optional(), // opsional — dibuat baru jika tidak ada
+    message: z.string().min(1, 'Message must not be empty').max(2000),
+    sessionId: z.string().uuid().optional(), // optional — new session created if absent
 });
 
 // ─── SSE Helpers ─────────────────────────────────────────────────────────────
@@ -37,7 +39,7 @@ function sseWrite(res: Response, event: string, data: unknown): void {
 // ─── Route Handler ────────────────────────────────────────────────────────────
 
 router.post('/', async (req: Request, res: Response) => {
-    // 1. Validasi input
+    // 1. Validate input
     const parsed = runAgentSchema.safeParse(req.body);
     if (!parsed.success) {
         res.status(400).json({
@@ -52,16 +54,16 @@ router.post('/', async (req: Request, res: Response) => {
 
     const { message, sessionId: incomingSessionId } = parsed.data;
 
-    // 2. Set SSE headers — harus dilakukan sebelum res.write() pertama
+    // 2. Set SSE headers — must be done before first res.write()
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // disable Nginx buffering jika ada proxy
+    res.setHeader('X-Accel-Buffering', 'no'); // disable Nginx buffering if behind proxy
     res.flushHeaders();
 
     res.write(': connected\n\n');
 
-    // Track apakah client sudah disconnect
+    // Track whether client has disconnected
     let clientDisconnected = false;
     res.on('close', () => {
         clientDisconnected = true;
@@ -70,10 +72,11 @@ router.post('/', async (req: Request, res: Response) => {
     let taskId: string | null = null;
 
     try {
-        // 3. Resolve session — pakai yang ada atau buat baru
-        const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
-            ?? req.socket.remoteAddress
-            ?? null;
+        // 3. Resolve session — use existing or create new
+        const ipAddress =
+            (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
+            req.socket.remoteAddress ??
+            null;
         const userAgent = req.headers['user-agent'] ?? null;
 
         let sessionId: string;
@@ -85,14 +88,13 @@ router.post('/', async (req: Request, res: Response) => {
             } else {
                 await createSessionWithId(incomingSessionId, ipAddress, userAgent);
             }
-
             sessionId = incomingSessionId;
         } else {
             const session = await createSession(ipAddress, userAgent);
             sessionId = session.id;
         }
 
-        // 4. Buat task record di DB
+        // 4. Create task record in DB
         const task = await createTask({
             sessionId,
             userMessage: message,
@@ -101,9 +103,11 @@ router.post('/', async (req: Request, res: Response) => {
         });
         taskId = task.id;
 
+        logger.info({ taskId, sessionId, provider: env.LLM_PROVIDER }, 'Task created');
+
         await updateTaskStatus(taskId, 'running');
 
-        // 5. Emit event: start
+        // 5. Emit start event
         sseWrite(res, 'start', {
             sessionId,
             taskId,
@@ -111,53 +115,82 @@ router.post('/', async (req: Request, res: Response) => {
             model: env.LLM_MODEL,
         });
 
-        // 6. Jalankan agent loop — consume AsyncGenerator
+        // ── Cache check ───────────────────────────────────────────────────────────
+        // Check if an identical query was already answered in this session.
+        // On hit: stream the cached answer and skip the agent loop entirely.
+        // On miss: fall through to the agent loop, cache the answer on completion.
+        const cachedAnswer = await getCachedAnswer(sessionId, message);
+
+        if (cachedAnswer !== null) {
+            logger.info({ taskId, sessionId }, 'Serving response from query cache');
+
+            await updateTaskStatus(taskId, 'done', {
+                finalAnswer: cachedAnswer,
+                iterations: 0,
+            });
+
+            sseWrite(res, 'done', { finalAnswer: cachedAnswer, taskId, fromCache: true });
+
+            return; // finally block still runs — res.end() will be called
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
+        // 6. Run agent loop — consume AsyncGenerator
         let finalAnswer: string | null = null;
         let lastIteration = 0;
 
         for await (const step of runAgent({ sessionId, userMessage: message })) {
-            // Stop jika client sudah disconnect — hemat resource
+            // Stop if client disconnected — conserve resources
             if (clientDisconnected) break;
 
             lastIteration = step.iteration ?? lastIteration;
 
-            // Emit step ke frontend
+            // Emit step to frontend
             sseWrite(res, 'step', step);
 
-            // Simpan step ke DB — map AgentStep type ke step_type DB
+            // Persist step to DB
             await persistStep(taskId, step);
 
-            // Tangkap final answer dari step
+            // Capture final answer from step
             if (step.type === 'final_answer') {
                 finalAnswer = step.message ?? null;
             }
         }
 
-        // 7. Update task status di DB
+        // 7. Update task status in DB
         if (!clientDisconnected) {
             await updateTaskStatus(taskId, 'done', {
                 finalAnswer: finalAnswer ?? undefined,
                 iterations: lastIteration,
             });
 
-            // 8. Emit event: done
+            // Store answer in cache for future identical queries
+            if (finalAnswer !== null) {
+                await setCachedAnswer(sessionId, message, finalAnswer);
+            }
+
+            // 8. Emit done event
             sseWrite(res, 'done', { finalAnswer, taskId });
+
+            logger.info({ taskId, iterations: lastIteration }, 'Task completed');
         }
 
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Terjadi kesalahan tidak terduga';
+        const errorMessage =
+            err instanceof Error ? err.message : 'An unexpected error occurred';
 
-        // Update task status jika task sudah terbuat
+        logger.error({ err, taskId }, 'Agent route encountered an unhandled error');
+
         if (taskId) {
             try {
                 await updateTaskStatus(taskId, 'error');
             } catch {
-                // Jangan throw — kita sudah dalam catch block
+                // Already in catch — do not re-throw
             }
         }
 
         if (!clientDisconnected) {
-            sseWrite(res, 'error', { message });
+            sseWrite(res, 'error', { message: errorMessage });
         }
     } finally {
         res.end();
@@ -166,7 +199,7 @@ router.post('/', async (req: Request, res: Response) => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Map AgentStep ke format DB task_steps
+// Map AgentStep to DB task_steps format
 async function persistStep(taskId: string, step: AgentStep): Promise<void> {
     try {
         switch (step.type) {
@@ -197,16 +230,15 @@ async function persistStep(taskId: string, step: AgentStep): Promise<void> {
                 });
                 break;
 
-            // final_answer dan error tidak disimpan sebagai step —
-            // final_answer masuk ke kolom tasks.final_answer
-            // error masuk ke tasks.status = 'error'
+            // final_answer and error are not stored as steps —
+            // final_answer goes to tasks.final_answer column
+            // error goes to tasks.status = 'error'
             default:
                 break;
         }
     } catch {
-        // Gagal persist step tidak boleh crash SSE stream
-        // Log saja, agent loop tetap jalan
-        console.error(`Gagal menyimpan step ke DB: taskId=${taskId}, type=${step.type}`);
+        // Step persist failure must not crash the SSE stream
+        logger.error({ taskId, stepType: step.type }, 'Failed to persist step to DB');
     }
 }
 

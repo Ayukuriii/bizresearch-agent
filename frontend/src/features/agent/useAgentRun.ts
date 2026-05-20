@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createSSEClient } from '@/lib/sseClient.ts';
 import type { SSEClient } from '@/lib/sseClient.ts';
 import { useAgentStore } from '@/store/agentStore.ts';
+import logger from '@/lib/logger.ts';
 
 const API_BASE = import.meta.env.VITE_API_URL as string;
 
@@ -10,7 +11,7 @@ export function useAgentRun() {
     const sseClientRef = useRef<SSEClient | null>(null);
     const queryClient = useQueryClient();
 
-    const { sessionId, status, addStep, setFinalAnswer, setStatus } =
+    const { sessionId, status, addStep, setFinalAnswer, setStatus, setFromCache } =
         useAgentStore();
 
     // Cleanup stream on unmount
@@ -22,32 +23,31 @@ export function useAgentRun() {
 
     const run = useCallback(
         (message: string) => {
-            // Prevent concurrent runs
             if (status === 'running') return;
 
-            // Cancel any lingering stream before starting a new one
             sseClientRef.current?.cancel();
-
             setStatus('running');
+            setFromCache(false);
 
             sseClientRef.current = createSSEClient(
                 `${API_BASE}/agent/run`,
                 { message, sessionId },
                 {
                     onStart: () => {
-                        // Stream confirmed open — status already set to 'running' above
+                        // Stream confirmed open — status already 'running'
                     },
                     onStep: (payload) => {
                         addStep(payload);
                     },
                     onDone: (payload) => {
                         setFinalAnswer(payload.finalAnswer);
+                        setFromCache(payload.fromCache ?? false);
                         setStatus('done');
                         queryClient.invalidateQueries({ queryKey: ['history', sessionId] });
                         sseClientRef.current = null;
                     },
                     onError: (payload) => {
-                        console.error('[useAgentRun] stream error:', payload.message);
+                        logger.error('[useAgentRun] stream error:', payload.message);
                         setStatus('error');
                         queryClient.invalidateQueries({ queryKey: ['history', sessionId] });
                         sseClientRef.current = null;
@@ -55,7 +55,7 @@ export function useAgentRun() {
                 }
             );
         },
-        [status, sessionId, addStep, setFinalAnswer, setStatus, queryClient]
+        [status, sessionId, addStep, setFinalAnswer, setStatus, setFromCache, queryClient]
     );
 
     const cancel = useCallback(() => {

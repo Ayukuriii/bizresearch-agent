@@ -1,6 +1,6 @@
 export type SSEEventType = 'start' | 'step' | 'done' | 'error';
 
-// Shape sesuai format SSE dari backend (src/routes/agent.ts)
+// Payload shapes match backend format (src/routes/agent.ts)
 export interface SSEStartPayload {
     sessionId: string;
     provider: string;
@@ -17,6 +17,8 @@ export interface SSEStepPayload {
 
 export interface SSEDonePayload {
     finalAnswer: string;
+    taskId?: string;
+    fromCache?: boolean;
 }
 
 export interface SSEErrorPayload {
@@ -34,7 +36,7 @@ export interface SSEClient {
     cancel: () => void;
 }
 
-// Parse satu SSE "block" (dipisah \n\n) menjadi { event, data }
+// Parse one SSE block (separated by \n\n) into { event, data }
 function parseSSEBlock(block: string): { event: string; data: string } | null {
     const lines = block.split('\n');
     let event = 'message';
@@ -59,8 +61,12 @@ export function createSSEClient(
 ): SSEClient {
     const abortController = new AbortController();
 
-    // IIFE async supaya bisa pakai await tanpa mengubah signature fungsi
     (async () => {
+        // Track whether a clean done/error event was received.
+        // If the stream closes without one, we fire onError so the
+        // UI is never left stuck in 'running' state.
+        let cleanlyFinished = false;
+
         try {
             const response = await fetch(url, {
                 method: 'POST',
@@ -70,6 +76,7 @@ export function createSSEClient(
             });
 
             if (!response.ok || !response.body) {
+                cleanlyFinished = true;
                 handlers.onError?.({
                     message: `Server responded with status ${response.status}`,
                 });
@@ -87,10 +94,10 @@ export function createSSEClient(
 
                 buffer += decoder.decode(value, { stream: true });
 
-                // SSE blocks dipisah oleh \n\n
+                // SSE blocks are separated by \n\n
                 const blocks = buffer.split('\n\n');
 
-                // Block terakhir mungkin belum lengkap — simpan kembali ke buffer
+                // Last block may be incomplete — hold it in the buffer
                 buffer = blocks.pop() ?? '';
 
                 for (const block of blocks) {
@@ -104,7 +111,7 @@ export function createSSEClient(
                     try {
                         payload = JSON.parse(parsed.data);
                     } catch {
-                        // Data bukan JSON valid — skip
+                        // Data is not valid JSON — skip
                         continue;
                     }
 
@@ -116,16 +123,27 @@ export function createSSEClient(
                             handlers.onStep?.(payload as SSEStepPayload);
                             break;
                         case 'done':
+                            cleanlyFinished = true;
                             handlers.onDone?.(payload as SSEDonePayload);
                             break;
                         case 'error':
+                            cleanlyFinished = true;
                             handlers.onError?.(payload as SSEErrorPayload);
                             break;
                     }
                 }
             }
+
+            // Stream ended — if no done/error event was received,
+            // the connection dropped unexpectedly
+            if (!cleanlyFinished) {
+                handlers.onError?.({
+                    message: 'Stream closed unexpectedly. The server may have crashed or the connection was dropped.',
+                });
+            }
+
         } catch (err) {
-            // AbortError bukan error sungguhan — user cancel stream
+            // AbortError is not a real error — user cancelled the stream
             if (err instanceof DOMException && err.name === 'AbortError') return;
 
             handlers.onError?.({

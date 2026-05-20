@@ -6,11 +6,12 @@ import {
 } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentStore } from '@/store/agentStore.ts';
 import type { AgentStep } from '../../store/agentStore';
-import {Brain, Wrench, FileText, ChevronDown, CheckCircle} from 'lucide-react';
+import { Brain, Wrench, FileText, ChevronDown, CheckCircle } from 'lucide-react';
 
-// --- Step type config ---
+// ─── Step type config ─────────────────────────────────────────────────────────
 
 interface StepConfig {
     label: string;
@@ -53,7 +54,12 @@ function getStepConfig(type: AgentStep['type']): StepConfig {
     }
 }
 
-// --- Individual step card ---
+// ─── Step card ────────────────────────────────────────────────────────────────
+
+// Shared entrance animation applied to every card variant
+const CARD_BASE =
+    'rounded-lg border bg-card px-4 py-3 space-y-2 ' +
+    'animate-in fade-in slide-in-from-bottom-2 duration-300';
 
 function StepCard({ step, index }: { step: AgentStep; index: number }) {
     const config = getStepConfig(step.type);
@@ -61,86 +67,88 @@ function StepCard({ step, index }: { step: AgentStep; index: number }) {
 
     const header = (
         <div className="flex items-center gap-2">
-        <span className="text-muted-foreground">{config.icon}</span>
+            <span className="text-muted-foreground">{config.icon}</span>
             <Badge variant={config.badgeVariant} className="text-xs">
-        {config.label}
-        </Badge>
-    {step.toolName && (
-        <span className="text-xs font-mono text-muted-foreground">
-            {step.toolName}
-            </span>
-    )}
-    <span className="text-xs text-muted-foreground ml-auto">#{index + 1}</span>
-    </div>
-);
+                {config.label}
+            </Badge>
+            {step.toolName && (
+                <span className="text-xs font-mono text-muted-foreground">
+                    {step.toolName}
+                </span>
+            )}
+            <span className="text-xs text-muted-foreground ml-auto">#{index + 1}</span>
+        </div>
+    );
 
     // Thinking step — plain message
     if (step.type === 'thinking') {
         return (
-            <div className="rounded-lg border bg-card px-4 py-3 space-y-2">
+            <div className={CARD_BASE}>
                 {header}
-        {step.message && (
-            <p className="text-sm text-foreground leading-relaxed pl-1">
-                {step.message}
-                </p>
-        )}
-        </div>
-    );
+                {step.message && (
+                    <p className="text-sm text-foreground leading-relaxed pl-1">
+                        {step.message}
+                    </p>
+                )}
+            </div>
+        );
     }
 
-    // Tool call — show args as JSON
+    // Tool call — args as JSON
     if (step.type === 'tool_call') {
         return (
-            <div className="rounded-lg border bg-card px-4 py-3 space-y-2">
+            <div className={CARD_BASE}>
                 {header}
-        {step.args && (
-            <pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto text-muted-foreground">
-                {JSON.stringify(step.args, null, 2)}
-                </pre>
-        )}
-        </div>
-    );
+                {step.args && (
+                    <pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto
+                        text-muted-foreground max-w-full">
+                        {JSON.stringify(step.args, null, 2)}
+                    </pre>
+                )}
+            </div>
+        );
     }
 
     // Tool result — collapsible because content can be long
     if (isCollapsible) {
         return (
             <Collapsible>
-                <div className="rounded-lg border bg-card px-4 py-3 space-y-2">
-            <div className="flex items-center justify-between">
-                {header}
-                <CollapsibleTrigger className="ml-2 p-1 rounded hover:bg-muted transition-colors">
-        <ChevronDown className="w-4 h-4 text-muted-foreground" />
-        </CollapsibleTrigger>
-        </div>
-        <CollapsibleContent>
-        <pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto text-muted-foreground whitespace-pre-wrap">
-            {step.result}
-            </pre>
-            </CollapsibleContent>
-            </div>
+                <div className={CARD_BASE}>
+                    <div className="flex items-center justify-between">
+                        {header}
+                        <CollapsibleTrigger className="ml-2 p-1 rounded hover:bg-muted transition-colors">
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent>
+                        <pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto
+                            text-muted-foreground whitespace-pre-wrap max-w-full">
+                            {step.result}
+                        </pre>
+                    </CollapsibleContent>
+                </div>
             </Collapsible>
-    );
+        );
     }
 
     return null;
 }
 
-// --- Skeleton loader ---
+// ─── Skeleton loader ──────────────────────────────────────────────────────────
 
 function StepSkeleton() {
     return (
-        <div className="rounded-lg border bg-card px-4 py-3 space-y-2 animate-pulse">
-        <div className="flex items-center gap-2">
-        <div className="w-4 h-4 rounded bg-muted" />
-        <div className="w-16 h-5 rounded bg-muted" />
+        <div className="rounded-lg border bg-card px-4 py-3 space-y-2">
+            <div className="flex items-center gap-2">
+                <Skeleton className="w-4 h-4 rounded" />
+                <Skeleton className="w-16 h-5 rounded" />
             </div>
-            <div className="w-3/4 h-3 rounded bg-muted" />
+            <Skeleton className="w-3/4 h-3 rounded" />
         </div>
-);
+    );
 }
 
-// --- Main component ---
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function StepViewer() {
     const { steps, status } = useAgentStore();
@@ -155,17 +163,17 @@ export function StepViewer() {
 
     return (
         <ScrollArea className="h-[420px] w-full rounded-lg border bg-background">
-        <div className="flex flex-col gap-3 p-4">
-            {steps.map((step, i) => (
+            <div className="flex flex-col gap-3 p-4">
+                {steps.map((step, i) => (
                     <StepCard key={i} step={step} index={i} />
-))}
+                ))}
 
-    {/* Skeleton shown while running and waiting for next step */}
-    {status === 'running' && <StepSkeleton />}
+                {/* Skeleton shown while running and waiting for next step */}
+                {status === 'running' && <StepSkeleton />}
 
-    {/* Anchor for auto-scroll */}
-    <div ref={bottomRef} />
-    </div>
-    </ScrollArea>
-);
+                {/* Anchor for auto-scroll */}
+                <div ref={bottomRef} />
+            </div>
+        </ScrollArea>
+    );
 }

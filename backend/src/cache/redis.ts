@@ -1,9 +1,11 @@
 import { createClient, RedisClientType } from 'redis';
 import { env } from '../config/env';
+import logger from '../lib/logger';
 
 // ============================================================
-// Redis Client — singleton, dipakai oleh:
+// Redis Client — singleton, used by:
 //   - src/agent/memory.ts  (conversation history)
+//   - src/lib/cache.ts     (query result cache)
 //   - src/routes/health.ts (ping check)
 // ============================================================
 
@@ -15,7 +17,10 @@ export const redisClient = createClient({
     socket: {
         reconnectStrategy: (attempts) => {
             if (attempts >= RECONNECT_MAX_ATTEMPTS) {
-                console.error(`Redis: max reconnect attempts (${RECONNECT_MAX_ATTEMPTS}) reached.`);
+                logger.error(
+                    { attempts },
+                    'Redis: max reconnect attempts reached',
+                );
                 return new Error('Redis max reconnect attempts reached');
             }
 
@@ -25,20 +30,18 @@ export const redisClient = createClient({
 }) as RedisClientType;
 
 redisClient.on('error', (err) => {
-    console.error('Redis client error:', err);
+    logger.error({ err }, 'Redis client error');
 });
 
 redisClient.on('reconnecting', () => {
-    console.error('Redis: attempting to reconnect...');
+    logger.warn('Redis: attempting to reconnect...');
 });
 
 export async function connectRedis(): Promise<void> {
-    if (redisClient.isReady) {
-        return;
-    }
+    if (redisClient.isReady) return;
 
     await redisClient.connect();
-    console.log('✅  Redis Connected');
+    logger.info('Redis connected');
 }
 
 export async function getRedisClient(): Promise<RedisClientType> {
