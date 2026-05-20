@@ -19,7 +19,7 @@ import type {
 // Constants
 // ============================================================
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 const DEFAULT_MAX_TOKENS = 8192;
 const DEFAULT_TEMPERATURE = 0.7;
 
@@ -119,6 +119,8 @@ export class GeminiAdapter implements LLMProvider {
 
         this.client = new GoogleGenerativeAI(env.GOOGLE_AI_API_KEY);
         this.modelName = env.LLM_MODEL ?? DEFAULT_MODEL;
+
+        console.log(`[GeminiAdapter] Using model: ${this.modelName}`);
     }
 
     async chat(messages: LLMMessage[], options: ChatOptions = {}): Promise<LLMResponse> {

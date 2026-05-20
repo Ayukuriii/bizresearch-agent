@@ -7,11 +7,12 @@ export interface SSEStartPayload {
 }
 
 export interface SSEStepPayload {
-    type: 'thinking' | 'tool_call' | 'tool_result';
+    type: 'thinking' | 'tool_call' | 'tool_result' | 'final_answer';
     message?: string;
     toolName?: string;
     args?: Record<string, unknown>;
     result?: string;
+    iteration?: number;
 }
 
 export interface SSEDonePayload {

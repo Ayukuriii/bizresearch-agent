@@ -5,6 +5,7 @@ import { AgentStep } from '../llm/types';
 import { env } from '../config/env';
 import {
     createSession,
+    createSessionWithId,
     createTask,
     updateTaskStatus,
     appendTaskStep,
@@ -78,16 +79,14 @@ router.post('/', async (req: Request, res: Response) => {
         let sessionId: string;
 
         if (incomingSessionId) {
-            // Cek apakah session ada di DB
             const existing = await getSession(incomingSessionId);
             if (existing) {
-                sessionId = existing.id;
-                await touchSession(sessionId);
+                await touchSession(incomingSessionId);
             } else {
-                // sessionId dikirim tapi tidak ada di DB — buat baru
-                const session = await createSession(ipAddress, userAgent);
-                sessionId = session.id;
+                await createSessionWithId(incomingSessionId, ipAddress, userAgent);
             }
+
+            sessionId = incomingSessionId;
         } else {
             const session = await createSession(ipAddress, userAgent);
             sessionId = session.id;

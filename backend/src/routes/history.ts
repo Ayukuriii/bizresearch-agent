@@ -32,12 +32,26 @@ router.get('/:sessionId', async (req: Request, res: Response) => {
     try {
         const tasks = await getTasksBySession(parsed.data);
 
+        const mappedTasks = tasks.map((task) => ({
+            id: task.id,
+            sessionId: task.session_id,
+            userMessage: task.user_message,
+            finalAnswer: task.final_answer,
+            status: task.status,
+            provider: task.provider,
+            model: task.model,
+            iterations: task.iterations,
+            createdAt: task.created_at,
+            completedAt: task.completed_at,
+            steps: [],
+        }));
+
         res.status(200).json({
             success: true,
             data: {
                 sessionId: parsed.data,
-                total: tasks.length,
-                tasks,
+                total: mappedTasks.length,
+                tasks: mappedTasks,
             },
         });
     } catch (err) {

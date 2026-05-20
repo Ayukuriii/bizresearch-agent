@@ -183,3 +183,24 @@ export async function appendTaskStep(params: {
 
     return result.rows[0];
 }
+
+
+export async function createSessionWithId(
+    id: string,
+    ipAddress: string | null,
+    userAgent: string | null,
+): Promise<SessionRow> {
+    const result = await pool.query<SessionRow>(
+        `INSERT INTO sessions (id, ip_address, user_agent)
+         VALUES ($1, $2, $3)
+             ON CONFLICT (id) DO UPDATE SET last_active = NOW()
+                                     RETURNING *`,
+        [id, ipAddress, userAgent],
+    );
+
+    if (!result.rows[0]) {
+        throw new AppError('Gagal membuat session', 'DB_INSERT_ERROR');
+    }
+
+    return result.rows[0];
+}
