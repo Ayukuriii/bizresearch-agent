@@ -7,8 +7,8 @@
  * Script ini aman dijalankan berulang kali (semua CREATE pakai IF NOT EXISTS)
  */
 
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Pool } from 'pg';
 import * as dotenv from 'dotenv';
 
@@ -29,11 +29,11 @@ async function migrate(): Promise<void> {
     try {
         console.log('[migrate] Connecting to database...');
 
-        const schemaPath = join(process.cwd(), 'schema.sql');
-        const sql = readFileSync(schemaPath, 'utf-8');
+        const schemaPath = path.resolve(process.cwd(), 'src/db/schema.sql');
+        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
 
         console.log('[migrate] Running schema.sql...');
-        await client.query(sql);
+        await client.query(schemaSql);
 
         console.log('[migrate] ✅ Migration complete. Tables created (if not exists):');
         console.log('  - sessions');
