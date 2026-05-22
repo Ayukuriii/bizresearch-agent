@@ -16,6 +16,15 @@ bizresearch-agent/
 
 ---
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [`backend/README.md`](./backend/README.md) | Backend setup, API reference, LLM adapter guide, DB schema |
+| [`frontend/README.md`](./frontend/README.md) | Frontend setup, component structure, SSE hook, store |
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -49,7 +58,7 @@ cp frontend/.env.example frontend/.env
 Minimum required variables in `backend/.env`:
 
 ```env
-LLM_PROVIDER=gemini          # gemini | claude | groq
+LLM_PROVIDER=gemini          # gemini | claude
 GOOGLE_AI_API_KEY=...
 TAVILY_API_KEY=...
 DATABASE_URL=postgresql://user:pass@localhost:5432/bizresearch
@@ -99,8 +108,7 @@ Health check: http://localhost:3001/api/health
 │  Route → Orchestrator (agent loop, max 10 iter.) │
 │            ├── LLM Factory                       │
 │            │     ├── Gemini adapter              │
-│            │     ├── Claude adapter              │
-│            │     └── Groq adapter                │
+│            │     └── Claude adapter              │
 │            ├── Tools                             │
 │            │     ├── webSearch (Tavily)          │
 │            │     ├── scraper (cheerio)           │
@@ -119,28 +127,6 @@ The entire LLM layer is provider-agnostic. Swap with a single env change:
 |----------|-----------|-------|
 | Google Gemini | `gemini` | Default; free tier 1 500 req/day |
 | Anthropic Claude | `claude` | Best reasoning quality; use for demos |
-| Groq | `groq` | Fastest inference |
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [`backend/README.md`](./backend/README.md) | Backend setup, API reference, LLM adapter guide, DB schema |
-| [`frontend/README.md`](./frontend/README.md) | Frontend setup, component structure, SSE hook, store |
-
----
-
-## Build Phases
-
-| Phase | Scope | Status |
-|-------|-------|--------|
-| 1 — Foundation | `env.ts`, `llm/types.ts`, Gemini adapter, factory | ⬜ |
-| 2 — Agent Core | Tools, prompts, memory, orchestrator | ⬜ |
-| 3 — Backend API | DB, queries, routes, Claude + Groq adapters | ⬜ |
-| 4 — Frontend | SSE hook, Zustand store, UI components | ⬜ |
-| 5 — Polish | Production env, README, demo scenarios | ⬜ |
 
 ---
 
@@ -148,9 +134,3 @@ The entire LLM layer is provider-agnostic. Swap with a single env change:
 
 **Backend** — Node.js 20, TypeScript 5.4, Express 4, `@anthropic-ai/sdk`, `@google/generative-ai`, `openai` (Groq), PostgreSQL 15 (`pg`), Redis 7, Zod  
 **Frontend** — React 18, TypeScript 5, Vite 5, Tailwind CSS 3, Zustand, TanStack Query v5, shadcn/ui, Axios
-
----
-
-## License
-
-MIT
